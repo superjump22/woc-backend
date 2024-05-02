@@ -1,0 +1,15 @@
+[[source]]
+url = "http://mirrors.tencentyun.com/pypi/simple"
+verify_ssl = false
+name = "pip_conf_index_global"
+
+[packages]
+apscheduler = "*"
+docker = "*"
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"
