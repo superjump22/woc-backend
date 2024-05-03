@@ -16,10 +16,10 @@ class ScheduleJob(BaseModel):
 
 
 def update_docker_image(container_name: str):
-    print(datetime.now())
-    print(f"Updating docker image for container {container_name}")
+    print(f"{datetime.now()} updating docker image for container {container_name}", flush=True)
     client = docker.from_env()
     client.containers.run(image="containrrr/watchtower", command=["--run-once", container_name], auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+    client.images.prune()
 
 
 jobstores = {
@@ -41,11 +41,6 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 app = FastAPI(lifespan=lifespan)
-
-
-@app.get("/")
-async def home():
-    return {"message": "Hello Woc!"}
 
 
 @app.get("/scheduler/jobs/")
