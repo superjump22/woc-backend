@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import docker
 from fastapi import FastAPI
+import json
 from pydantic import BaseModel
 from typing import Any
 
@@ -46,7 +47,10 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/scheduler/jobs/")
 async def get_schedule_jobs():
     scheduler.print_jobs()
-    return {"jobs": len(scheduler.get_jobs())}
+    jobs = []
+    for job in scheduler.get_jobs():
+        jobs.append(u'%s' % job)
+    return json.dumps(jobs)
 
 
 @app.post("/scheduler/jobs/")
