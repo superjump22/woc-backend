@@ -56,4 +56,4 @@ async def add_schedule_job(job: ScheduleJob):
     if scheduler.get_job(job.id) != None:
         scheduler.remove_job(job.id)
     scheduler.add_job(id=job.id, func=update_docker_image, args=[job.container_name], trigger=job.trigger, **job.trigger_args)
-    return get_schedule_jobs()
+    return await get_schedule_jobs()
