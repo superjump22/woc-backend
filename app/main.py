@@ -10,7 +10,7 @@ from typing import Any
 
 class ScheduleJob(BaseModel):
     id: str
-    container_name: str
+    container_name: str | None
     trigger: str
     trigger_args: Any
 
@@ -21,6 +21,16 @@ def update_docker_image(container_name: str):
     print(f"updating docker image for container {container_name}", flush=True)
     client = docker.from_env()
     client.containers.run(image="containrrr/watchtower", command=["--run-once", container_name],
+                          auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+    client.images.prune()
+
+
+def update_docker_images():
+    print('')
+    print(datetime.now())
+    print(f"updating docker images for all containers", flush=True)
+    client = docker.from_env()
+    client.containers.run(image="containrrr/watchtower", command="--run-once",
                           auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
     client.images.prune()
 
@@ -62,8 +72,12 @@ async def get_schedule_jobs():
 async def add_schedule_job(job: ScheduleJob):
     if scheduler.get_job(job.id) != None:
         scheduler.remove_job(job.id)
-    scheduler.add_job(id=job.id, func=update_docker_image, args=[job.container_name],
-                      trigger=job.trigger, **job.trigger_args)
+    if job.container_name == None:
+        scheduler.add_job(id=job.id, func=update_docker_images,
+                          trigger=job.trigger, **job.trigger_args)
+    else:
+        scheduler.add_job(id=job.id, func=update_docker_image, args=[job.container_name],
+                          trigger=job.trigger, **job.trigger_args)
     return await get_schedule_jobs()
 
 
