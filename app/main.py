@@ -16,7 +16,9 @@ class ScheduleJob(BaseModel):
 
 
 def update_docker_image(container_name: str):
-    print(f"{datetime.now()} updating docker image for container {container_name}", flush=True)
+    print('\n')
+    print(datetime.now())
+    print(f"updating docker image for container {container_name}", flush=True)
     client = docker.from_env()
     client.containers.run(image="containrrr/watchtower", command=["--run-once", container_name], auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
     client.images.prune()
@@ -45,6 +47,8 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/scheduler/jobs/")
 async def get_schedule_jobs():
+    print('\n')
+    print(datetime.now())
     scheduler.print_jobs()
     jobs = []
     for job in scheduler.get_jobs():
