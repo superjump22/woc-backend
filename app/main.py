@@ -62,3 +62,28 @@ async def add_schedule_job(job: ScheduleJob):
         scheduler.remove_job(job.id)
     scheduler.add_job(id=job.id, func=update_docker_image, args=[job.container_name], trigger=job.trigger, **job.trigger_args)
     return await get_schedule_jobs()
+
+
+@app.get("/scheduler/jobs/{job_id}")
+async def get_schedule_job(job_id: str):
+    print('\n')
+    print(datetime.now())
+    job = scheduler.get_job(job_id)
+    if job == None:
+        print('None', flush=True)
+        return 'None'
+    print(u'%s' % job, flush=True)
+    return u'%s' % job
+
+
+@app.delete("/scheduler/jobs/{job_id}")
+async def del_schedule_job(job_id: str):
+    print('\n')
+    print(datetime.now())
+    try:
+        scheduler.remove_job(job_id)
+        print('True', flush=True)
+        return 'True'
+    except:
+        print('False', flush=True)
+        return 'False'
