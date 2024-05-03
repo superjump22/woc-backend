@@ -7,6 +7,7 @@ name = "pip_conf_index_global"
 apscheduler = "*"
 docker = "*"
 fastapi = "*"
+sqlalchemy = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 
 [dev-packages]
