@@ -2,6 +2,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from contextlib import asynccontextmanager
 from datetime import datetime
+import docker
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Any
@@ -17,6 +18,8 @@ class ScheduleJob(BaseModel):
 def update_docker_image(container_name: str):
     print(datetime.now())
     print(f"Updating docker image for container {container_name}")
+    client = docker.from_env()
+    client.containers.run(image="containrrr/watchtower", command=["--run-once", container_name], auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
 
 
 jobstores = {
