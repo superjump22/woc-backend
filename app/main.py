@@ -16,7 +16,7 @@ class ScheduleJob(BaseModel):
 
 
 def update_docker_image(container_name: str):
-    print('\n')
+    print('')
     print(datetime.now())
     print(f"updating docker image for container {container_name}", flush=True)
     client = docker.from_env()
@@ -47,12 +47,13 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/scheduler/jobs/")
 async def get_schedule_jobs():
-    print('\n')
+    print('')
     print(datetime.now())
-    scheduler.print_jobs()
+    print('Jobs:')
     jobs = []
     for job in scheduler.get_jobs():
-        jobs.append(u'%s' % job)
+        print(u'    id: %s, %s' % (job.id, job))
+        jobs.append(u'id: %s, %s' % (job.id, job))
     return jobs
 
 
@@ -66,7 +67,7 @@ async def add_schedule_job(job: ScheduleJob):
 
 @app.get("/scheduler/jobs/{job_id}")
 async def get_schedule_job(job_id: str):
-    print('\n')
+    print('')
     print(datetime.now())
     job = scheduler.get_job(job_id)
     if job == None:
@@ -78,7 +79,7 @@ async def get_schedule_job(job_id: str):
 
 @app.delete("/scheduler/jobs/{job_id}")
 async def del_schedule_job(job_id: str):
-    print('\n')
+    print('')
     print(datetime.now())
     try:
         scheduler.remove_job(job_id)
