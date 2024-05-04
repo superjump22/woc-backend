@@ -61,8 +61,7 @@ scheduler = BackgroundScheduler(jobstores=jobstores, job_defaults=job_defaults)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    client = docker.from_env()
-    client.images.prune()
+    update_self()
     if scheduler.get_job('woc-backend') == None:
         scheduler.add_job(id='woc-backend', func=update_self,
                           trigger='interval', minutes=30)
