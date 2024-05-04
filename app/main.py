@@ -17,35 +17,86 @@ class ScheduleJob(BaseModel):
 
 
 def update_self():
-    print('')
-    print(datetime.now())
-    print("updating containrrr/watchtower & superjump22/woc-backend", flush=True)
     client = docker.from_env()
-    client.images.pull("containrrr/watchtower")
-    client.images.pull("superjump22/woc-backend")
-    client.images.prune()
-    client.containers.run(image="containrrr/watchtower", command=["--run-once", 'woc-backend'],
-                          auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+    try:
+        oldId = client.images.get('containrrr/watchtower').id
+    except:
+        oldId = None
+    newId = client.images.pull('containrrr/watchtower').id
+    watchtowerPulled = oldId != newId
+    try:
+        oldId = client.images.get('superjump22/woc-backend').id
+    except:
+        oldId = None
+    newId = client.images.pull('superjump22/woc-backend').id
+    wocPulled = oldId != newId
+    if watchtowerPulled or wocPulled:
+        client.images.prune()
+    if watchtowerPulled:
+        print('')
+        print(datetime.now())
+        print('containrrr/watchtower updated', flush=True)
+    if wocPulled:
+        client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', 'woc-backend'],
+                              auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+        print('')
+        print(datetime.now())
+        print('superjump22/woc-backend updated', flush=True)
 
 
-def update_docker_image(container_name: str):
-    print('')
-    print(datetime.now())
-    print(f"updating docker image for container {container_name}", flush=True)
-    client = docker.from_env()
-    client.containers.run(image="containrrr/watchtower", command=["--run-once", container_name],
-                          auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
-    client.images.prune()
+def update_image(container_name: str):
+    if container_name == '' or container_name == 'woc-backend':
+        return
+    try:
+        client = docker.from_env()
+        container = client.containers.get(container_name)
+        tags = container.image.tags
+        pulled = False
+        for tag in tags:
+            if tag.startswith('superjump22/woc-backend'):
+                continue
+            if not tag.startswith('superjump22/'):
+                continue
+            if client.images.pull(tag).id == container.image.id:
+                continue
+            else:
+                pulled = True
+        if pulled:
+            client.images.prune()
+            client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', container_name],
+                                  auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+            print('')
+            print(datetime.now())
+            print(f'{container_name} updated', flush=True)
+    except:
+        return
 
 
-def update_docker_images():
-    print('')
-    print(datetime.now())
-    print(f"updating docker images for all containers", flush=True)
-    client = docker.from_env()
-    client.containers.run(image="containrrr/watchtower", command="--run-once",
-                          auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
-    client.images.prune()
+def update_all():
+    try:
+        client = docker.from_env()
+        images = client.images.list()
+        pulled = False
+        for image in images:
+            tags = image.tags
+            for tag in tags:
+                if tag.startswith('superjump22/woc-backend'):
+                    continue
+                if not tag.startswith('superjump22/'):
+                    continue
+                if client.images.pull(tag).id == image.id:
+                    continue
+                else:
+                    pulled = True
+        if pulled:
+            client.images.prune()
+            client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', '--disable-containers', 'woc-backend'],
+                                  auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+            print('')
+            print(datetime.now())
+            print(f'all containers updated', flush=True)
+    except:
+        return
 
 
 jobstores = {
@@ -73,7 +124,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.get("/scheduler/jobs/")
+@app.get('/scheduler/jobs/')
 async def get_schedule_jobs():
     print('')
     print(datetime.now())
@@ -81,24 +132,24 @@ async def get_schedule_jobs():
     jobs = []
     for job in scheduler.get_jobs():
         print(u'    id: %s, %s' % (job.id, job))
-        jobs.append({"id": job.id, "content": u'%s' % job})
+        jobs.append({'id': job.id, 'content': u'%s' % job})
     return jobs
 
 
-@app.post("/scheduler/jobs/")
+@app.post('/scheduler/jobs/')
 async def add_schedule_job(job: ScheduleJob):
     if scheduler.get_job(job.id) != None:
         scheduler.remove_job(job.id)
     if job.container_name == None:
-        scheduler.add_job(id=job.id, func=update_docker_images,
+        scheduler.add_job(id=job.id, func=update_all,
                           trigger=job.trigger, **job.trigger_args)
     else:
-        scheduler.add_job(id=job.id, func=update_docker_image, args=[job.container_name],
+        scheduler.add_job(id=job.id, func=update_image, args=[job.container_name],
                           trigger=job.trigger, **job.trigger_args)
     return await get_schedule_jobs()
 
 
-@app.get("/scheduler/jobs/{job_id}")
+@app.get('/scheduler/jobs/{job_id}')
 async def get_schedule_job(job_id: str):
     print('')
     print(datetime.now())
@@ -107,10 +158,10 @@ async def get_schedule_job(job_id: str):
         print('None', flush=True)
         return 'None'
     print(u'%s' % job, flush=True)
-    return {"id": job.id, "content": u'%s' % job}
+    return {'id': job.id, 'content': u'%s' % job}
 
 
-@app.delete("/scheduler/jobs/{job_id}")
+@app.delete('/scheduler/jobs/{job_id}')
 async def del_schedule_job(job_id: str):
     print('')
     print(datetime.now())
