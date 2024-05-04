@@ -15,6 +15,18 @@ class ScheduleJob(BaseModel):
     trigger_args: Any
 
 
+def update_self():
+    print('')
+    print(datetime.now())
+    print("updating containrrr/watchtower & superjump22/woc-backend", flush=True)
+    client = docker.from_env()
+    client.images.pull("containrrr/watchtower")
+    client.images.pull("superjump22/woc-backend")
+    client.images.prune()
+    client.containers.run(image="containrrr/watchtower", command=["--run-once", 'woc-backend'],
+                          auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+
+
 def update_docker_image(container_name: str):
     print('')
     print(datetime.now())
@@ -49,6 +61,11 @@ scheduler = BackgroundScheduler(jobstores=jobstores, job_defaults=job_defaults)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    client = docker.from_env()
+    client.images.prune()
+    if scheduler.get_job('woc-backend') == None:
+        scheduler.add_job(id='woc-backend', func=update_self,
+                          trigger='interval', minutes=30)
     scheduler.start()
     yield
     scheduler.shutdown()
