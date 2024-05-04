@@ -1,3 +1,4 @@
+# coding=utf-8
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from contextlib import asynccontextmanager
