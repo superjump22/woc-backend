@@ -24,18 +24,17 @@ def update_self():
         oldId = None
     newId = client.images.pull('containrrr/watchtower').id
     watchtowerPulled = oldId != newId
+    if watchtowerPulled:
+        client.images.prune()
+        print('')
+        print(datetime.now())
+        print('containrrr/watchtower updated', flush=True)
     try:
         oldId = client.images.get('superjump22/woc-backend').id
     except:
         oldId = None
     newId = client.images.pull('superjump22/woc-backend').id
     wocPulled = oldId != newId
-    if watchtowerPulled or wocPulled:
-        client.images.prune()
-    if watchtowerPulled:
-        print('')
-        print(datetime.now())
-        print('containrrr/watchtower updated', flush=True)
     if wocPulled:
         client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', 'woc-backend'],
                               auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
@@ -62,7 +61,6 @@ def update_image(container_name: str):
             else:
                 pulled = True
         if pulled:
-            client.images.prune()
             client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', container_name],
                                   auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
             print('')
@@ -75,26 +73,25 @@ def update_image(container_name: str):
 def update_all():
     try:
         client = docker.from_env()
-        images = client.images.list()
+        containers = client.containers.list()
         pulled = False
-        for image in images:
-            tags = image.tags
+        for container in containers:
+            tags = container.image.tags
             for tag in tags:
                 if tag.startswith('superjump22/woc-backend'):
                     continue
                 if not tag.startswith('superjump22/'):
                     continue
-                if client.images.pull(tag).id == image.id:
+                if client.images.pull(tag).id == container.image.id:
                     continue
                 else:
                     pulled = True
         if pulled:
-            client.images.prune()
             client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', '--disable-containers', 'woc-backend'],
                                   auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
             print('')
             print(datetime.now())
-            print(f'all containers updated', flush=True)
+            print(f'all running containers updated', flush=True)
     except:
         return
 
@@ -113,6 +110,8 @@ scheduler = BackgroundScheduler(jobstores=jobstores, job_defaults=job_defaults)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    client = docker.from_env()
+    client.images.prune()
     update_self()
     scheduler.start()
     if scheduler.get_job('woc-backend') == None:
