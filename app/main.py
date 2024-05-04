@@ -62,10 +62,10 @@ scheduler = BackgroundScheduler(jobstores=jobstores, job_defaults=job_defaults)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     update_self()
+    scheduler.start()
     if scheduler.get_job('woc-backend') == None:
         scheduler.add_job(id='woc-backend', func=update_self,
                           trigger='interval', minutes=30)
-    scheduler.start()
     yield
     scheduler.shutdown()
 
