@@ -21,6 +21,7 @@ def prune():
     client = docker.from_env()
     client.containers.prune()
     client.images.prune()
+    client.volumes.prune()
 
 
 def update_self():
