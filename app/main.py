@@ -11,9 +11,16 @@ from typing import Any
 
 class ScheduleJob(BaseModel):
     id: str
+    jobstore: str
     container_name: str | None
     trigger: str
     trigger_args: Any
+
+
+def prune():
+    client = docker.from_env()
+    client.containers.prune()
+    client.images.prune()
 
 
 def update_self():
@@ -97,7 +104,8 @@ def update_all():
 
 
 jobstores = {
-    'default': SQLAlchemyJobStore(url='sqlite:////data/woc.sqlite')
+    'self': SQLAlchemyJobStore(url='sqlite:////data/self.sqlite'),
+    'default': SQLAlchemyJobStore(url='sqlite:////data/default.sqlite')
 }
 
 job_defaults = {
@@ -110,12 +118,14 @@ scheduler = BackgroundScheduler(jobstores=jobstores, job_defaults=job_defaults)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    client = docker.from_env()
-    client.images.prune()
+    prune()
     update_self()
     scheduler.start()
-    if scheduler.get_job('woc-backend') == None:
-        scheduler.add_job(id='woc-backend', func=update_self,
+    if scheduler.get_job(job_id='0', jobstore='self') == None:
+        scheduler.add_job(id='0', name='container & image prune', jobstore='self', func=prune,
+                          trigger='interval', hours=12)
+    if scheduler.get_job(job_id='1', jobstore='self') == None:
+        scheduler.add_job(id='1', name='update self & watchtower', jobstore='self', func=update_self,
                           trigger='interval', minutes=30)
     yield
     scheduler.shutdown()
@@ -124,12 +134,12 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.get('/scheduler/jobs/')
-async def get_schedule_jobs():
+async def get_schedule_jobs(jobstore: str | None = None):
     print('')
     print(datetime.now())
     print('Jobs:')
     jobs = []
-    for job in scheduler.get_jobs():
+    for job in scheduler.get_jobs(jobstore=jobstore):
         print(u'    id: %s, %s' % (job.id, job))
         jobs.append({'id': job.id, 'content': u'%s' % job})
     return jobs
@@ -137,22 +147,22 @@ async def get_schedule_jobs():
 
 @app.post('/scheduler/jobs/')
 async def add_schedule_job(job: ScheduleJob):
-    if scheduler.get_job(job.id) != None:
-        scheduler.remove_job(job.id)
+    if scheduler.get_job(job_id=job.id, jobstore=job.jobstore) != None:
+        scheduler.remove_job(job_id=job.id, jobstore=job.jobstore)
     if job.container_name == None:
-        scheduler.add_job(id=job.id, func=update_all,
+        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_all,
                           trigger=job.trigger, **job.trigger_args)
     else:
-        scheduler.add_job(id=job.id, func=update_image, args=[job.container_name],
+        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_image, args=[job.container_name],
                           trigger=job.trigger, **job.trigger_args)
     return await get_schedule_jobs()
 
 
 @app.get('/scheduler/jobs/{job_id}')
-async def get_schedule_job(job_id: str):
+async def get_schedule_job(job_id: str, jobstore: str | None = None):
     print('')
     print(datetime.now())
-    job = scheduler.get_job(job_id)
+    job = scheduler.get_job(job_id=job_id, jobstore=jobstore)
     if job == None:
         print('None', flush=True)
         return 'None'
@@ -161,11 +171,11 @@ async def get_schedule_job(job_id: str):
 
 
 @app.delete('/scheduler/jobs/{job_id}')
-async def del_schedule_job(job_id: str):
+async def del_schedule_job(job_id: str, jobstore: str | None = None):
     print('')
     print(datetime.now())
     try:
-        scheduler.remove_job(job_id)
+        scheduler.remove_job(job_id=job_id, jobstore=jobstore)
         print('True', flush=True)
         return 'True'
     except:
