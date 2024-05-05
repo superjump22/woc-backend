@@ -22,6 +22,7 @@ def prune():
     client.containers.prune()
     client.images.prune()
     client.volumes.prune()
+    client.networks.prune()
 
 
 def update_self():
