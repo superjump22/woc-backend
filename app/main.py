@@ -1,5 +1,4 @@
 # coding=utf-8
-from app.dst import mod
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from contextlib import asynccontextmanager
@@ -26,26 +25,25 @@ def prune():
     client.networks.prune()
 
 
-def update_self():
+def update_image(image: str):
     client = docker.from_env()
     try:
-        oldId = client.images.get('containrrr/watchtower').id
+        oldId = client.images.get(image).id
     except:
         oldId = None
-    newId = client.images.pull('containrrr/watchtower').id
-    watchtowerPulled = oldId != newId
-    if watchtowerPulled:
+    newId = client.images.pull(image).id
+    return oldId != newId
+
+
+def update_self():
+    if update_image('containrrr/watchtower'):
+        client = docker.from_env()
         client.images.prune()
         print('')
         print(datetime.now())
         print('containrrr/watchtower updated', flush=True)
-    try:
-        oldId = client.images.get('superjump22/woc-backend').id
-    except:
-        oldId = None
-    newId = client.images.pull('superjump22/woc-backend').id
-    wocPulled = oldId != newId
-    if wocPulled:
+    if update_image('superjump22/woc-backend'):
+        client = docker.from_env()
         client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', 'woc-backend'],
                               auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
         print('')
@@ -53,7 +51,7 @@ def update_self():
         print('superjump22/woc-backend updated', flush=True)
 
 
-def update_image(container_name: str):
+def update_container(container_name: str):
     if container_name == '' or container_name == 'woc-backend':
         return
     try:
@@ -80,7 +78,7 @@ def update_image(container_name: str):
         return
 
 
-def update_all():
+def update_all_containers():
     try:
         client = docker.from_env()
         containers = client.containers.list()
@@ -134,7 +132,6 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(mod.router)
 
 
 @app.get('/scheduler/jobs/')
@@ -154,10 +151,10 @@ async def add_schedule_job(job: ScheduleJob):
     if scheduler.get_job(job_id=job.id, jobstore=job.jobstore) != None:
         scheduler.remove_job(job_id=job.id, jobstore=job.jobstore)
     if job.container_name == None:
-        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_all,
+        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_all_containers,
                           trigger=job.trigger, **job.trigger_args)
     else:
-        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_image, args=[job.container_name],
+        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_container, args=[job.container_name],
                           trigger=job.trigger, **job.trigger_args)
     return await get_schedule_jobs()
 
