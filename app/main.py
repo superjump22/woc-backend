@@ -107,8 +107,8 @@ def update_all():
 
 
 jobstores = {
-    'self': RedisJobStore(jobs_key='apscheduler.jobs.self', run_times_key='apscheduler.run_times.self'),
-    'default': RedisJobStore(jobs_key='apscheduler.jobs.default', run_times_key='apscheduler.run_times.default'),
+    'self': RedisJobStore(jobs_key='apscheduler.jobs.self', run_times_key='apscheduler.run_times.self', port=10881),
+    'default': RedisJobStore(jobs_key='apscheduler.jobs.default', run_times_key='apscheduler.run_times.default', port=10881),
 }
 
 job_defaults = {
