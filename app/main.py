@@ -1,6 +1,7 @@
 # coding=utf-8
+from app.dst import mod
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.jobstores.redis import RedisJobStore
 from contextlib import asynccontextmanager
 from datetime import datetime
 import docker
@@ -106,8 +107,8 @@ def update_all():
 
 
 jobstores = {
-    'self': SQLAlchemyJobStore(url='sqlite:////data/self.sqlite'),
-    'default': SQLAlchemyJobStore(url='sqlite:////data/default.sqlite')
+    'self': RedisJobStore(jobs_key='apscheduler.jobs.self', run_times_key='apscheduler.run_times.self'),
+    'default': RedisJobStore(jobs_key='apscheduler.jobs.default', run_times_key='apscheduler.run_times.default'),
 }
 
 job_defaults = {
@@ -133,6 +134,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(mod.router)
 
 
 @app.get('/scheduler/jobs/')

@@ -9,6 +9,7 @@ docker = "*"
 fastapi = "*"
 sqlalchemy = "*"
 uvicorn = {extras = ["standard"], version = "*"}
+redis = {extras = ["hiredis"], version = "*"}
 
 [dev-packages]
 
