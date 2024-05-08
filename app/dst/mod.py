@@ -53,6 +53,7 @@ async def get_info(mod_id: str):
 
 @router.post("/info/")
 async def update_info_list(mod_id_list: list[str]):
+    print(mod_id_list)
     client = docker.from_env()
     client.images.pull('superjump22/woc-backend-dst')
     client.images.prune()
@@ -77,11 +78,11 @@ async def update_info_list(mod_id_list: list[str]):
                 item = json.loads(json_str)
             except:
                 item = []
-            data.push({"mod_id": mod_id, "info": json.dumps(item),
+            data.append({"mod_id": mod_id, "info": json.dumps(item),
                        "create_at": datetime.now(), "update_at": datetime.now()})
     finally:
         container.stop()
-        container.remove()
+    print(data)
     table = ModInfo.__table__
     stmt = insert(table).values(data)
     session = Session()
