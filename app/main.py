@@ -6,13 +6,15 @@ from datetime import datetime
 import docker
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Any
+from typing import Any, Literal
 
 
 class ScheduleJob(BaseModel):
     id: str
     jobstore: str
+    job_type: Literal['container', 'image']
     container_name: str | None
+    image: str | None
     trigger: str
     trigger_args: Any
 
@@ -25,30 +27,29 @@ def prune():
     client.networks.prune()
 
 
-def update_image(image: str):
+def pull_image(image: str):
     client = docker.from_env()
     try:
         oldId = client.images.get(image).id
     except:
         oldId = None
     newId = client.images.pull(image).id
-    return oldId != newId
+    if oldId != newId:
+        print('')
+        print(datetime.now())
+        print(f'image {image} updated', flush=True)
+        return True
+    return False
 
 
 def update_self():
-    if update_image('containrrr/watchtower'):
+    if pull_image('containrrr/watchtower'):
         client = docker.from_env()
         client.images.prune()
-        print('')
-        print(datetime.now())
-        print('containrrr/watchtower updated', flush=True)
-    if update_image('superjump22/woc-backend'):
+    if pull_image('superjump22/woc-backend'):
         client = docker.from_env()
         client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', 'woc-backend'],
                               auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
-        print('')
-        print(datetime.now())
-        print('superjump22/woc-backend updated', flush=True)
 
 
 def update_container(container_name: str):
@@ -60,7 +61,7 @@ def update_container(container_name: str):
         tags = container.image.tags
         pulled = False
         for tag in tags:
-            if tag.startswith('superjump22/woc-backend'):
+            if tag.startswith('superjump22/woc-backend:'):
                 continue
             if not tag.startswith('superjump22/'):
                 continue
@@ -73,7 +74,7 @@ def update_container(container_name: str):
                                   auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
             print('')
             print(datetime.now())
-            print(f'{container_name} updated', flush=True)
+            print(f'container {container_name} updated', flush=True)
     except:
         return
 
@@ -86,7 +87,7 @@ def update_all_containers():
         for container in containers:
             tags = container.image.tags
             for tag in tags:
-                if tag.startswith('superjump22/woc-backend'):
+                if tag.startswith('superjump22/woc-backend:'):
                     continue
                 if not tag.startswith('superjump22/'):
                     continue
@@ -100,6 +101,43 @@ def update_all_containers():
             print('')
             print(datetime.now())
             print(f'all running containers updated', flush=True)
+    except:
+        return
+
+
+def update_image(image: str):
+    if image == '' or image == 'superjump22/woc-backend' or image.startswith('superjump22/woc-backend:'):
+        return
+    if not image.startswith('superjump22/'):
+        return
+    if pull_image(image):
+        client = docker.from_env()
+        client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', '--disable-containers', 'woc-backend'],
+                              auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+
+
+def update_all_images():
+    try:
+        client = docker.from_env()
+        images = client.images.list()
+        pulled = False
+        for image in images:
+            tags = image.tags
+            for tag in tags:
+                if tag.startswith('superjump22/woc-backend:'):
+                    continue
+                if not tag.startswith('superjump22/'):
+                    continue
+                if client.images.pull(tag).id == image.id:
+                    continue
+                else:
+                    pulled = True
+        if pulled:
+            client.containers.run(image='containrrr/watchtower', command=['--run-once', '--cleanup', '--remove-volumes', '--no-pull', '--stop-timeout', '30s', '--disable-containers', 'woc-backend'],
+                                  auto_remove=True, detach=True, remove=True, volumes=['/var/run/docker.sock:/var/run/docker.sock'])
+            print('')
+            print(datetime.now())
+            print(f'all images updated', flush=True)
     except:
         return
 
@@ -150,12 +188,20 @@ async def get_schedule_jobs(jobstore: str | None = None):
 async def add_schedule_job(job: ScheduleJob):
     if scheduler.get_job(job_id=job.id, jobstore=job.jobstore) != None:
         scheduler.remove_job(job_id=job.id, jobstore=job.jobstore)
-    if job.container_name == None:
-        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_all_containers,
-                          trigger=job.trigger, **job.trigger_args)
-    else:
-        scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_container, args=[job.container_name],
-                          trigger=job.trigger, **job.trigger_args)
+    if job.job_type == 'container':
+        if job.container_name == None:
+            scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_all_containers,
+                              trigger=job.trigger, **job.trigger_args)
+        else:
+            scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_container, args=[job.container_name],
+                              trigger=job.trigger, **job.trigger_args)
+    elif job.job_type == 'image':
+        if job.image == None:
+            scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_all_images,
+                              trigger=job.trigger, **job.trigger_args)
+        else:
+            scheduler.add_job(id=job.id, jobstore=job.jobstore, func=update_image, args=[job.image],
+                              trigger=job.trigger, **job.trigger_args)
     return await get_schedule_jobs()
 
 
